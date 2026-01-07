@@ -14,6 +14,8 @@ db.init_app(app)
 
 import model
 
+with app.app_context():
+    db.create_all()
 
 user_sid = {}
 sid_user = {}
@@ -314,6 +316,5 @@ def undelivered_msg(other_user_id):
 
 
 if __name__ == '__main__':
-        with app.app_context():
-            db.create_all()
+        app.run(debug=True)
         socketio.run(app, host='0.0.0.0', port=5000, debug=True)
