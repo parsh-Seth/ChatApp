@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>jainco • Auth</title>
+
+  <style>
+    :root{
+      --sage: #97B3AE;
+      --mint: #D2E0D3;
+      --rose: #F0DDD6;
+      --blush: #F2C3B9;
+      --stone: #D6CBBF;
+      --ivory: #F0EEEA;
+
+      --text: #1f2937;
+      --muted: #6b7280;
+      --card: rgba(240, 238, 234, 0.82);
+      --border: rgba(31, 41, 55, 0.10);
+      --shadow: 0 18px 45px rgba(31, 41, 55, 0.18);
+    }
+
+    *{ box-sizing: border-box; }
+    html, body { height: 100%; }
+    body{
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      color: var(--text);
+      background:
+        radial-gradient(1200px 700px at 20% 15%, var(--mint), transparent 55%),
+        radial-gradient(900px 600px at 80% 20%, var(--rose), transparent 55%),
+        radial-gradient(900px 700px at 70% 90%, var(--blush), transparent 60%),
+        linear-gradient(135deg, var(--sage), var(--ivory));
+    }
+
+    .auth-wrap{
+      min-height: 100%;
+      display: grid;
+      place-items: center;
+      padding: 28px 16px;
+    }
+
+    .auth-card{
+      width: min(420px, 100%);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      padding: 22px 20px 18px;
+    }
+
+    .auth-header{
+      text-align: center;
+      margin-bottom: 16px;
+    }
+
+    .brand{
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .brand-mark{
+      width: 34px;
+      height: 34px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--sage), var(--blush));
+      box-shadow: 0 10px 18px rgba(31,41,55,0.12);
+    }
+
+    .brand-title{
+      margin: 0;
+      font-size: 28px;
+      letter-spacing: 0.2px;
+    }
+
+    .brand-subtitle{
+      margin: 8px 0 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .alert{
+      margin: 12px 0 14px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(242, 195, 185, 0.45);
+      border: 1px solid rgba(242, 195, 185, 0.9);
+      color: #7a2f27;
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .segmented{
+      position: relative;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      padding: 6px;
+      border-radius: 14px;
+      background: rgba(214, 203, 191, 0.35);
+      border: 1px solid var(--border);
+      margin: 10px 0 14px;
+    }
+
+    .seg-btn{
+      position: relative;
+      z-index: 2;
+      border: 0;
+      background: transparent;
+      padding: 10px 8px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 13px;
+      color: rgba(31,41,55,0.8);
+      cursor: pointer;
+    }
+
+    .seg-btn[aria-selected="true"]{
+      color: #0f172a;
+    }
+
+    .seg-indicator{
+      position: absolute;
+      inset: 6px;
+      width: calc(50% - 3px);
+      border-radius: 12px;
+      background: rgba(240, 238, 234, 0.8);
+      border: 1px solid rgba(151, 179, 174, 0.55);
+      box-shadow: 0 10px 20px rgba(31,41,55,0.10);
+      transform: translateX(0);
+      transition: transform 220ms ease;
+    }
+
+    .panel{ display: none; }
+    .panel.is-active{ display: block; }
+
+    .form{
+      display: grid;
+      gap: 12px;
+    }
+
+    .grid-2{
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    @media (min-width: 420px){
+      .grid-2{ grid-template-columns: 1fr 1fr; }
+    }
+
+    .field{
+      display: grid;
+      gap: 6px;
+    }
+
+    .field span{
+      font-size: 12px;
+      color: rgba(31,41,55,0.75);
+      font-weight: 650;
+    }
+
+    input{
+      width: 100%;
+      padding: 11px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(31,41,55,0.14);
+      background: rgba(240, 238, 234, 0.9);
+      outline: none;
+      font-size: 14px;
+      transition: box-shadow 160ms ease, border-color 160ms ease;
+    }
+
+    input:focus{
+      border-color: rgba(151, 179, 174, 0.85);
+      box-shadow: 0 0 0 4px rgba(151, 179, 174, 0.22);
+    }
+
+    .row{
+      display: flex;
+      justify-content: flex-end;
+      margin-top: -2px;
+    }
+
+    .btn{
+      border: 0;
+      border-radius: 12px;
+      padding: 11px 12px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 120ms ease, filter 160ms ease;
+    }
+
+    .btn.primary{
+      background: linear-gradient(135deg, var(--sage), #86a8a3);
+      color: #0b1b19;
+      box-shadow: 0 14px 24px rgba(151,179,174,0.35);
+    }
+
+    .btn.primary:hover{ filter: brightness(0.97); }
+    .btn.primary:active{ transform: translateY(1px); }
+
+    .muted{
+      margin: 2px 0 0;
+      font-size: 12.5px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .link{
+      color: #245b54;
+      text-decoration: none;
+      font-weight: 750;
+    }
+
+    .link:hover{ text-decoration: underline; }
+
+    .auth-footer{
+      margin-top: 14px;
+      text-align: center;
+    }
+
+    .tiny{
+      font-size: 11px;
+      color: rgba(31,41,55,0.55);
+    }
+  </style>
+</head>
+
+{# Try to pick the right tab even if backend doesn't pass an "active" flag #}
+{% set msg = email if email is defined else '' %}
+{% set inferred_signup = (msg|string|lower).find('exists') != -1 or (msg|string|lower).find('error') != -1 %}
+{% set show_signup = (request.path == '/signup') or (request.args.get('mode') == 'signup') or inferred_signup %}
+
+<body data-initial-tab="{{ 'signup' if show_signup else 'login' }}">
+  <main class="auth-wrap">
+    <section class="auth-card" aria-label="Authentication">
+      <header class="auth-header">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true"></div>
+          <h1 class="brand-title">jainco</h1>
+        </div>
+        <p class="brand-subtitle">Welcome back. Or create your account in seconds.</p>
+      </header>
+
+      {% if email is defined and email %}
+        <div class="alert" role="alert">{{ email }}</div>
+      {% endif %}
+
+      <nav class="segmented" aria-label="Switch authentication mode">
+        <button class="seg-btn" type="button" data-tab="login" aria-controls="panel-login">Login</button>
+        <button class="seg-btn" type="button" data-tab="signup" aria-controls="panel-signup">Signup</button>
+        <span class="seg-indicator" aria-hidden="true"></span>
+      </nav>
+
+      <!-- LOGIN -->
+      <section id="panel-login" class="panel" data-panel="login">
+        <form class="form" method="POST" action="{{ url_for('login') }}">
+          <label class="field">
+            <span>Email address</span>
+            <input type="email" name="email" placeholder="you@example.com" autocomplete="email" required
+              value="{{ request.form.get('email', '') if request.method == 'POST' else '' }}" />
+          </label>
+
+          <label class="field">
+            <span>Password</span>
+            <input type="password" name="password" placeholder="••••••••" autocomplete="current-password" required />
+          </label>
+
+          <div class="row">
+            <a class="link" href="#" aria-label="Forgot password (placeholder)">Forgot password?</a>
+          </div>
+
+          <button class="btn primary" type="submit">Login</button>
+
+          <p class="muted">
+            New here?
+            <a class="link" href="{{ url_for('signup') }}">Create an account</a>
+          </p>
+        </form>
+      </section>
+
+      <!-- SIGNUP -->
+      <section id="panel-signup" class="panel" data-panel="signup">
+        <form class="form" method="POST" action="{{ url_for('signup') }}">
+          <div class="grid-2">
+            <label class="field">
+              <span>Username</span>
+              <input type="text" name="username" placeholder="jainco_user" autocomplete="username" required
+                value="{{ request.form.get('username', '') if request.method == 'POST' else '' }}" />
+            </label>
+
+            <label class="field">
+              <span>Full name</span>
+              <input type="text" name="fullname" placeholder="Jainco Patel" autocomplete="name" required
+                value="{{ request.form.get('fullname', '') if request.method == 'POST' else '' }}" />
+            </label>
+          </div>
+
+          <label class="field">
+            <span>Email address</span>
+            <input type="email" name="email" placeholder="you@example.com" autocomplete="email" required
+              value="{{ request.form.get('email', '') if request.method == 'POST' else '' }}" />
+          </label>
+
+          <label class="field">
+            <span>Password</span>
+            <input type="password" name="password" placeholder="Create a password" autocomplete="new-password" required />
+          </label>
+
+          <button class="btn primary" type="submit">Create account</button>
+
+          <p class="muted">
+            Already have an account?
+            <a class="link" href="{{ url_for('login') }}">Login</a>
+          </p>
+        </form>
+      </section>
+
+      <footer class="auth-footer">
+        <span class="tiny">By continuing, you agree to our Terms & Privacy Policy.</span>
+      </footer>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      const root = document.body;
+      const initial = root.dataset.initialTab || "login";
+
+      const buttons = Array.from(document.querySelectorAll(".seg-btn"));
+      const panels = Array.from(document.querySelectorAll(".panel"));
+      const indicator = document.querySelector(".seg-indicator");
+
+      function setTab(tab) {
+        panels.forEach(p => p.classList.toggle("is-active", p.dataset.panel === tab));
+        buttons.forEach((b, idx) => {
+          const active = b.dataset.tab === tab;
+          b.setAttribute("aria-selected", String(active));
+          if (active && indicator) {
+            indicator.style.transform = `translateX(${idx === 0 ? 0 : 100}%)`;
+          }
+        });
+      }
+
+      buttons.forEach(btn => btn.addEventListener("click", () => setTab(btn.dataset.tab)));
+
+      setTab(initial);
+    })();
+  </script>
+</body>
+</html>

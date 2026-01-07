@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Chat</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='chat.css') }}">
+</head>
+<body>
+  <div class="app">
+    <aside class="panel left">
+      <header class="panel-header">
+        <div>
+          <h1>Friends</h1>
+          <p class="muted">Logged in user id: <span class="mono">{{ current_user_id }}</span></p>
+          <p class="muted">Socket status: <span id="sockStatus" class="mono">disconnected</span></p>
+        </div>
+        <button id="refreshBtn" class="btn primary">Refresh</button>
+      </header>
+
+      <section class="tabs" aria-label="tabs">
+        <button class="tab active" data-tab="friends">Friends <span class="badge" id="friendsCount">0</span></button>
+        <button class="tab" data-tab="pending">Pending <span class="badge" id="pendingCount">0</span></button>
+        <button class="tab" data-tab="sent">Sent <span class="badge" id="sentCount">0</span></button>
+      </section>
+
+      <section class="search">
+        <label class="label">Search by username</label>
+        <div class="search-row">
+          <input id="searchInput" placeholder="e.g. alex123" autocomplete="off" />
+          <button id="searchBtn" class="btn">Search</button>
+        </div>
+
+        <div id="searchResult" class="search-result">
+          <span class="muted">Search for a user to send a friend request.</span>
+        </div>
+      </section>
+
+      <section class="list-wrap">
+        <div class="list-title">
+          <span id="listTitle">Friends</span>
+          <span class="muted" id="listStatus"></span>
+        </div>
+        <div id="peopleList" class="list"></div>
+      </section>
+    </aside>
+
+    <main class="panel right">
+      <header class="panel-header">
+        <div class="who">
+          <img id="whoAvatar" class="avatar lg" alt="" />
+          <div class="who-meta">
+            <div id="whoName" class="who-name">Select a friend</div>
+            <div id="whoUser" class="who-user muted">@</div>
+          </div>
+        </div>
+        <button id="clearBtn" class="btn">Clear Chat</button>
+      </header>
+
+      <section id="chatArea" class="chat-area">
+        <div class="empty muted" id="chatEmpty">
+          Select a friend to start chatting.
+        </div>
+        <div id="messages" class="messages"></div>
+      </section>
+
+      <footer class="composer">
+        <input id="msgInput" placeholder="Type a message..." disabled />
+        <button id="sendBtn" class="btn primary" disabled>Send</button>
+      </footer>
+    </main>
+  </div>
+
+  <!-- Socket.IO client (must be included for real-time messages) -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+  <script>
+    window.CURRENT_USER_ID = {{ current_user_id|tojson }};
+  </script>
+  <script src="{{ url_for('static', filename='chat.js') }}"></script>
+</body>
+</html>
