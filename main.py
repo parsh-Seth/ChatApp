@@ -252,9 +252,6 @@ def handle_private_message(data):
         return
 
 
-    # ✅ Save always (use receiver_id)
-
-
     payload = {'from': sender_username, 'message': body, 'sender_id': sender_user.id}
 
     target_sid = user_sid.get(recipient_username)
