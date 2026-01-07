@@ -254,9 +254,6 @@ def handle_private_message(data):
         return
 
 
-    # ✅ Save always (use receiver_id)
-
-
     payload = {'from': sender_username, 'message': body, 'sender_id': sender_user.id}
 
     target_sid = user_sid.get(recipient_username)
@@ -316,5 +313,7 @@ def undelivered_msg(other_user_id):
 
 
 if __name__ == '__main__':
+
         app.run(debug=True)
         socketio.run(app, host='0.0.0.0', port=5000, debug=True)
+
