@@ -7,73 +7,145 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='chat.css') }}">
 </head>
 <body>
-  <div class="app">
-    <aside class="panel left">
-      <header class="panel-header">
-        <div>
-          <h1>Friends</h1>
-          <p class="muted">Logged in user id: <span class="mono">{{ current_user_id }}</span></p>
-          <p class="muted">Socket status: <span id="sockStatus" class="mono">disconnected</span></p>
-        </div>
-        <button id="refreshBtn" class="btn primary">Refresh</button>
-      </header>
+  <div class="page">
+    <div class="shell">
+      <!-- LEFT PANEL -->
+      <aside class="left" aria-label="Friends panel">
+        <div class="left-inner">
+          <!-- Search bar -->
+          <div class="searchbar">
+            <input id="searchInput" type="text" placeholder="Search..." autocomplete="off" />
+            <button id="searchBtn" class="icon-btn" title="Search">
+              <!-- magnifier -->
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M10.5 3a7.5 7.5 0 1 1 4.5 13.5L20 21.5a1 1 0 0 1-1.4 1.4L13.6 17.9A7.5 7.5 0 0 1 10.5 3zm0 2a5.5 5.5 0 1 0 0 11a5.5 5.5 0 0 0 0-11z"/>
+              </svg>
+            </button>
+          </div>
 
-      <section class="tabs" aria-label="tabs">
-        <button class="tab active" data-tab="friends">Friends <span class="badge" id="friendsCount">0</span></button>
-        <button class="tab" data-tab="pending">Pending <span class="badge" id="pendingCount">0</span></button>
-        <button class="tab" data-tab="sent">Sent <span class="badge" id="sentCount">0</span></button>
-      </section>
+          <!-- FRIEND LIST (normal) -->
+          <div id="friendsWrap" class="list-wrap">
+            <div id="friendsList" class="list" aria-label="Friends list"></div>
+            <div id="friendsEmpty" class="empty-state">No friends yet.</div>
+          </div>
 
-      <section class="search">
-        <label class="label">Search by username</label>
-        <div class="search-row">
-          <input id="searchInput" placeholder="e.g. alex123" autocomplete="off" />
-          <button id="searchBtn" class="btn">Search</button>
-        </div>
+          <!-- SEARCH RESULTS (shows when searching) -->
+          <div id="searchWrap" class="list-wrap hidden">
+            <div class="list-hint" id="searchHint">Search results</div>
+            <div id="searchList" class="list" aria-label="Search results"></div>
+            <div id="searchEmpty" class="empty-state">No results.</div>
+          </div>
 
-        <div id="searchResult" class="search-result">
-          <span class="muted">Search for a user to send a friend request.</span>
-        </div>
-      </section>
+          <!-- Friend Requests "Page" (overlay on left panel) -->
+          <div id="requestsPage" class="requests-page hidden" aria-label="Friend requests">
+            <div class="requests-top">
+              <button id="reqBackBtn" class="icon-btn" title="Back">
+                <!-- back arrow -->
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M14.5 5.5a1 1 0 0 1 0 1.4L10.4 11H20a1 1 0 1 1 0 2h-9.6l4.1 4.1a1 1 0 1 1-1.4 1.4l-6-6a1 1 0 0 1 0-1.4l6-6a1 1 0 0 1 1.4 0z"/>
+                </svg>
+              </button>
 
-      <section class="list-wrap">
-        <div class="list-title">
-          <span id="listTitle">Friends</span>
-          <span class="muted" id="listStatus"></span>
-        </div>
-        <div id="peopleList" class="list"></div>
-      </section>
-    </aside>
+              <div class="seg">
+                <button class="seg-btn active" data-reqtab="received">Received</button>
+                <button class="seg-btn" data-reqtab="sent">Sent</button>
+              </div>
+            </div>
 
-    <main class="panel right">
-      <header class="panel-header">
-        <div class="who">
-          <img id="whoAvatar" class="avatar lg" alt="" />
-          <div class="who-meta">
-            <div id="whoName" class="who-name">Select a friend</div>
-            <div id="whoUser" class="who-user muted">@</div>
+            <div class="searchbar mini">
+              <input id="reqSearchInput" type="text" placeholder="Search..." autocomplete="off" />
+              <button id="reqSearchBtn" class="icon-btn" title="Search">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M10.5 3a7.5 7.5 0 1 1 4.5 13.5L20 21.5a1 1 0 0 1-1.4 1.4L13.6 17.9A7.5 7.5 0 0 1 10.5 3zm0 2a5.5 5.5 0 1 0 0 11a5.5 5.5 0 0 0 0-11z"/>
+                </svg>
+              </button>
+            </div>
+
+            <div class="list-wrap req-list">
+              <div id="reqList" class="list"></div>
+              <div id="reqEmpty" class="empty-state">No requests.</div>
+            </div>
+          </div>
+
+          <!-- Bottom bar -->
+          <div class="bottom-bar">
+            <button id="meBtn" class="me-chip" title="Me">
+              <img id="meAvatar" alt="" />
+            </button>
+
+            <div class="bottom-actions">
+              <button id="requestsBtn" class="icon-btn badge-wrap" title="Friend requests">
+                <!-- user icon -->
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 12a4.5 4.5 0 1 0-4.5-4.5A4.5 4.5 0 0 0 12 12zm0 2c-4.6 0-8.5 2.3-8.5 5.2a1 1 0 0 0 1 1h15a1 1 0 0 0 1-1C20.5 16.3 16.6 14 12 14z"/>
+                </svg>
+                <span id="reqBadge" class="badge hidden">0</span>
+              </button>
+
+              <button id="settingsBtn" class="icon-btn" title="Settings">
+                <!-- gear -->
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M19.4 13a7.9 7.9 0 0 0 .1-1l2-1.5a1 1 0 0 0 .3-1.3l-1.9-3.3a1 1 0 0 0-1.2-.4l-2.3.9a8.4 8.4 0 0 0-1.7-1l-.3-2.5a1 1 0 0 0-1-.9h-3.8a1 1 0 0 0-1 .9L9.3 4a8.4 8.4 0 0 0-1.7 1l-2.3-.9a1 1 0 0 0-1.2.4L2.2 7.8a1 1 0 0 0 .3 1.3l2 1.5a7.9 7.9 0 0 0 0 2l-2 1.5a1 1 0 0 0-.3 1.3l1.9 3.3a1 1 0 0 0 1.2.4l2.3-.9a8.4 8.4 0 0 0 1.7 1l.3 2.5a1 1 0 0 0 1 .9h3.8a1 1 0 0 0 1-.9l.3-2.5a8.4 8.4 0 0 0 1.7-1l2.3.9a1 1 0 0 0 1.2-.4l1.9-3.3a1 1 0 0 0-.3-1.3zM12 16a4 4 0 1 1 4-4a4 4 0 0 1-4 4z"/>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
-        <button id="clearBtn" class="btn">Clear Chat</button>
-      </header>
+      </aside>
 
-      <section id="chatArea" class="chat-area">
-        <div class="empty muted" id="chatEmpty">
-          Select a friend to start chatting.
-        </div>
-        <div id="messages" class="messages"></div>
-      </section>
+      <!-- RIGHT PANEL -->
+      <main class="right" aria-label="Chat panel">
+        <header class="chat-head">
+          <div class="chat-who">
+            <img id="whoAvatar" class="avatar-lg" alt="" />
+            <div class="who-text">
+              <div id="whoName" class="who-name">Select a friend</div>
+              <div id="whoUser" class="who-user">@</div>
+            </div>
+          </div>
 
-      <footer class="composer">
-        <input id="msgInput" placeholder="Type a message..." disabled />
-        <button id="sendBtn" class="btn primary" disabled>Send</button>
-      </footer>
-    </main>
+          <div class="chat-head-actions">
+            <div class="status-pill">
+              <span class="dot" id="sockDot"></span>
+              <span id="sockStatus">disconnected</span>
+            </div>
+            <button id="clearBtn" class="soft-btn" title="Clear chat">Clear</button>
+          </div>
+        </header>
+
+        <section id="chatArea" class="chat-area">
+          <div id="chatEmpty" class="chat-empty">Select a friend to start chatting.</div>
+          <div id="messages" class="messages"></div>
+        </section>
+
+        <footer class="composer">
+          <input id="msgInput" type="text" placeholder="type something..." disabled />
+          <button id="sendBtn" class="send-btn" disabled title="Send">
+            <!-- send icon -->
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3.4 20.2a1 1 0 0 1-.2-1.3l3.3-5.2a1 1 0 0 1 .9-.5H14a1 1 0 1 0 0-2H7.4a1 1 0 0 1-.9-.5L3.2 5.5A1 1 0 0 1 4.4 4l16.6 7a1 1 0 0 1 0 1.8L4.4 20a1 1 0 0 1-1 .2z"/>
+            </svg>
+          </button>
+        </footer>
+      </main>
+    </div>
   </div>
 
-  <!-- Socket.IO client (must be included for real-time messages) -->
-  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <!-- Settings modal (simple) -->
+  <div id="modalBackdrop" class="modal-backdrop hidden"></div>
+  <div id="settingsModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Settings">
+    <div class="modal-card">
+      <div class="modal-title">Settings</div>
+      <div class="modal-row">
+        <div class="muted">This is a placeholder settings panel.</div>
+      </div>
+      <div class="modal-actions">
+        <button id="closeSettingsBtn" class="soft-btn">Close</button>
+      </div>
+    </div>
+  </div>
 
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script>
     window.CURRENT_USER_ID = {{ current_user_id|tojson }};
   </script>

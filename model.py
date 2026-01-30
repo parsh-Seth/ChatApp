@@ -51,8 +51,7 @@ class User(db.Model):
     #Helper methods
 
     #Setter methods
-    def set_pass(self, raw_password):
-        self.password = generate_password_hash(raw_password)
+
 
     def set_name(self, name):
         self.name = name
@@ -65,6 +64,9 @@ class User(db.Model):
     #checker methods
     def check_password(self, raw_password):
         return check_password_hash(self.password, raw_password)
+
+    def set_pass(self, raw_password):
+        self.password = generate_password_hash(raw_password)
 
     @classmethod
     def find_by_email(cls, email):

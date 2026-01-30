@@ -1,24 +1,35 @@
-const $ = (s) => document.querySelector(s);
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
-const refreshBtn = $("#refreshBtn");
-const sockStatus = $("#sockStatus");
+/* ---- Elements ---- */
+const friendsWrap = $("#friendsWrap");
+const friendsList = $("#friendsList");
+const friendsEmpty = $("#friendsEmpty");
 
-const tabs = Array.from(document.querySelectorAll(".tab"));
-const listTitle = $("#listTitle");
-const listStatus = $("#listStatus");
-const peopleList = $("#peopleList");
+const searchWrap = $("#searchWrap");
+const searchList = $("#searchList");
+const searchEmpty = $("#searchEmpty");
+const searchHint = $("#searchHint");
 
-const friendsCount = $("#friendsCount");
-const pendingCount = $("#pendingCount");
-const sentCount = $("#sentCount");
+const searchInput = $("#searchInput");
+const searchBtn = $("#searchBtn");
+
+const requestsBtn = $("#requestsBtn");
+const reqBadge = $("#reqBadge");
+
+const requestsPage = $("#requestsPage");
+const reqBackBtn = $("#reqBackBtn");
+const reqTabs = $$(".seg-btn");
+const reqSearchInput = $("#reqSearchInput");
+const reqSearchBtn = $("#reqSearchBtn");
+const reqList = $("#reqList");
+const reqEmpty = $("#reqEmpty");
+
+const meAvatar = $("#meAvatar");
 
 const whoAvatar = $("#whoAvatar");
 const whoName = $("#whoName");
 const whoUser = $("#whoUser");
-
-const searchInput = $("#searchInput");
-const searchBtn = $("#searchBtn");
-const searchResult = $("#searchResult");
 
 const messagesEl = $("#messages");
 const chatEmpty = $("#chatEmpty");
@@ -26,13 +37,22 @@ const msgInput = $("#msgInput");
 const sendBtn = $("#sendBtn");
 const clearBtn = $("#clearBtn");
 
+const sockStatus = $("#sockStatus");
+const sockDot = $("#sockDot");
+
+const settingsBtn = $("#settingsBtn");
+const closeSettingsBtn = $("#closeSettingsBtn");
+const modalBackdrop = $("#modalBackdrop");
+const settingsModal = $("#settingsModal");
+
+/* ---- Helpers ---- */
 const PLACEHOLDER_AVATAR =
   "data:image/svg+xml;charset=utf-8," +
   encodeURIComponent(`
   <svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
-    <rect width="96" height="96" rx="20" fill="rgba(255,255,255,0.08)"/>
-    <circle cx="48" cy="38" r="16" fill="rgba(255,255,255,0.35)"/>
-    <path d="M18 84c6-16 18-24 30-24s24 8 30 24" fill="rgba(255,255,255,0.20)"/>
+    <rect width="96" height="96" rx="48" fill="rgba(22,52,58,0.06)"/>
+    <circle cx="48" cy="38" r="16" fill="rgba(22,52,58,0.22)"/>
+    <path d="M18 84c6-16 18-24 30-24s24 8 30 24" fill="rgba(22,52,58,0.14)"/>
   </svg>
 `);
 
@@ -45,6 +65,23 @@ function safeAvatar(url) {
   if (u.startsWith("image/")) return "/static/" + u;
   if (u.startsWith("www.")) return "https://" + u;
   return u;
+}
+
+function escapeHtml(s) {
+  return String(s)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function fmtTime(ts) {
+  try {
+    return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "";
+  }
 }
 
 async function fetchJSON(path, opts = {}) {
@@ -66,32 +103,18 @@ async function postAction(url) {
   });
 }
 
-function escapeHtml(s) {
-  return String(s)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
+/* ---- State ---- */
+let me = null;              // {id, username, name, profile_pic_url}
+let socket = null;
 
-function fmtTime(ts) {
-  try {
-    return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  } catch {
-    return "";
-  }
-}
+let friends = [];           // [{id,name,username,profile_pic_url}]
+let pending = [];           // received requests
+let sent = [];              // sent requests
 
-// ---- State ----
-let currentTab = "friends";
-let cache = { friends: [], pending: [], sent: [] };
-let selectedFriend = null;
+let selectedFriend = null;  // friend object
+let reqTab = "received";    // 'received' | 'sent'
 
-let me = null;     // {id, username, name, profile_pic_url}
-let socket = null; // socket.io client
-
-// Store messages per friend username (local UI thread)
+/* ---- Local message storage ---- */
 function msgKey(friendUsername) {
   return `msgs_${friendUsername}`;
 }
@@ -106,25 +129,7 @@ function saveMsgs(friendUsername, msgs) {
   localStorage.setItem(msgKey(friendUsername), JSON.stringify(msgs));
 }
 
-// ---- UI ----
-function setTab(tab) {
-  currentTab = tab;
-  tabs.forEach((t) => t.classList.toggle("active", t.dataset.tab === tab));
-  listTitle.textContent =
-    tab === "friends" ? "Friends" : tab === "pending" ? "Pending Requests" : "Sent Requests";
-
-  selectedFriend = null;
-  renderHeader();
-  renderList();
-  renderChat();
-}
-
-function renderCounts() {
-  friendsCount.textContent = cache.friends.length;
-  pendingCount.textContent = cache.pending.length;
-  sentCount.textContent = cache.sent.length;
-}
-
+/* ---- UI: header & chat ---- */
 function renderHeader() {
   if (!selectedFriend) {
     whoAvatar.src = PLACEHOLDER_AVATAR;
@@ -134,6 +139,7 @@ function renderHeader() {
     sendBtn.disabled = true;
     return;
   }
+
   whoAvatar.src = safeAvatar(selectedFriend.profile_pic_url);
   whoName.textContent = selectedFriend.name || selectedFriend.username;
   whoUser.textContent = "@" + selectedFriend.username;
@@ -143,6 +149,7 @@ function renderHeader() {
 
 function renderChat() {
   messagesEl.innerHTML = "";
+
   if (!selectedFriend) {
     chatEmpty.style.display = "block";
     return;
@@ -155,147 +162,297 @@ function renderChat() {
     div.className = `bubble ${m.who === "me" ? "me" : "them"}`;
     div.innerHTML = `
       <div>${escapeHtml(m.text)}</div>
-      <div class="meta2">${escapeHtml(m.from)} • ${fmtTime(m.ts)}</div>
+      <div class="bmeta">${escapeHtml(m.from)} • ${fmtTime(m.ts)}</div>
     `;
     messagesEl.appendChild(div);
   });
 
   // scroll down
-  messagesEl.parentElement.scrollTop = messagesEl.parentElement.scrollHeight;
+  const area = $("#chatArea");
+  area.scrollTop = area.scrollHeight;
 }
 
-function makeActionsForUser(u) {
-  const wrap = document.createElement("div");
-  wrap.className = "row-actions";
-
-  if (currentTab === "pending") {
-    wrap.innerHTML = `
-      <button class="btn ok">Accept</button>
-      <button class="btn danger">Decline</button>
-    `;
-    const [aBtn, dBtn] = wrap.querySelectorAll("button");
-    aBtn.addEventListener("click", async () => {
-      aBtn.disabled = dBtn.disabled = true;
-      try {
-        await postAction(`/accept_friends/${u.id}`);
-        await refreshAll();
-      } catch (e) {
-        alert(e.message);
-        aBtn.disabled = dBtn.disabled = false;
-      }
-    });
-    dBtn.addEventListener("click", async () => {
-      aBtn.disabled = dBtn.disabled = true;
-      try {
-        await postAction(`/decline_friends/${u.id}`);
-        await refreshAll();
-      } catch (e) {
-        alert(e.message);
-        aBtn.disabled = dBtn.disabled = false;
-      }
-    });
-    return wrap;
-  }
-
-  if (currentTab === "friends") {
-    wrap.innerHTML = `<button class="btn danger">Remove</button>`;
-    const rBtn = wrap.querySelector("button");
-    rBtn.addEventListener("click", async () => {
-      rBtn.disabled = true;
-      try {
-        await postAction(`/remove_friend/${u.id}`);
-        if (selectedFriend && selectedFriend.id === u.id) selectedFriend = null;
-        renderHeader();
-        renderChat();
-        await refreshAll();
-      } catch (e) {
-        alert(e.message);
-        rBtn.disabled = false;
-      }
-    });
-    return wrap;
-  }
-
-  return null; // sent tab
+/* ---- UI: friends list ---- */
+function setEmpty(el, show) {
+  el.style.display = show ? "block" : "none";
 }
 
-function renderList() {
-  const items = cache[currentTab] || [];
-  peopleList.innerHTML = "";
+function cardEl(user, opts = {}) {
+  const {
+    rightButton = null,      // { label, className, onClick, disabled }
+    subtitle = null,         // string (like @username)
+    selectable = true,
+    selected = false,
+    onClick = null,
+  } = opts;
 
-  if (!items.length) {
-    peopleList.innerHTML = `<div class="empty muted">No items.</div>`;
-    listStatus.textContent = "";
+  const card = document.createElement("div");
+  card.className = "card" + (selected ? " selected" : "");
+  card.setAttribute("role", selectable ? "button" : "group");
+
+  const avatar = document.createElement("img");
+  avatar.className = "avatar";
+  avatar.alt = "";
+  avatar.src = safeAvatar(user.profile_pic_url || user.profile_pic);
+
+  const text = document.createElement("div");
+  text.className = "card-text";
+  text.innerHTML = `
+    <div class="card-name">${escapeHtml(user.name || user.username || "")}</div>
+    <div class="card-user">${escapeHtml(subtitle ?? ("@" + (user.username || "")))}</div>
+  `;
+
+  card.appendChild(avatar);
+  card.appendChild(text);
+
+  if (rightButton) {
+    const actions = document.createElement("div");
+    actions.className = "card-actions";
+
+    const btn = document.createElement("button");
+    btn.className = `pill-btn ${rightButton.className || ""}`.trim();
+    btn.textContent = rightButton.label;
+    btn.disabled = !!rightButton.disabled;
+
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      rightButton.onClick?.(btn);
+    });
+
+    actions.appendChild(btn);
+    card.appendChild(actions);
+  }
+
+  if (selectable) {
+    card.addEventListener("click", () => onClick?.());
+  }
+
+  return card;
+}
+
+function renderFriendsList() {
+  friendsList.innerHTML = "";
+
+  if (!friends.length) {
+    setEmpty(friendsEmpty, true);
     return;
   }
-  listStatus.textContent = `${items.length} item(s)`;
+  setEmpty(friendsEmpty, false);
 
-  items.forEach((u) => {
-    const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `
-      <img class="avatar" alt="" src="${safeAvatar(u.profile_pic_url)}" />
-      <div class="meta">
-        <p class="name">${escapeHtml(u.name || "")}</p>
-        <p class="user">@${escapeHtml(u.username || "")}</p>
-      </div>
-    `;
-
-    const actions = makeActionsForUser(u);
-    if (actions) card.appendChild(actions);
-
-    if (currentTab === "friends") {
-      card.addEventListener("click", async (e) => {
-        if (e.target.closest("button")) return;
+  friends.forEach((u) => {
+    const isSel = selectedFriend && selectedFriend.id === u.id;
+    const el = cardEl(u, {
+      selected: isSel,
+      onClick: async () => {
         selectedFriend = u;
         renderHeader();
 
-        // IMPORTANT: fetch offline messages from DB for this friend
+        // fetch undelivered from DB for this friend, then show chat
         try {
           await fetchUndeliveredForFriend(u);
         } catch (err) {
           console.warn("undelivered fetch failed:", err);
         }
 
+        renderFriendsList(); // highlight
         renderChat();
-      });
-    }
-
-    peopleList.appendChild(card);
+      },
+    });
+    friendsList.appendChild(el);
   });
 }
 
-// ---- Load lists ----
-async function refreshAll() {
-  refreshBtn.disabled = true;
-  refreshBtn.textContent = "Refreshing...";
+/* ---- Search behavior (like your drawings) ----
+   - When search box has text:
+     - Hide normal friend list
+     - Show results: matching friends + (if not a friend) remote /search/<username> result with Add button
+   - Right chat stays as the last selected friend chat
+*/
+function showSearchMode(on) {
+  friendsWrap.classList.toggle("hidden", on);
+  searchWrap.classList.toggle("hidden", !on);
+}
 
-  try {
-    const [friendsRes, pendingRes, sentRes] = await Promise.all([
-      fetchJSON("/list_friends"),
-      fetchJSON("/get_pending_requests"),
-      fetchJSON("/sent_requests"),
-    ]);
+function findFriendByUsername(username) {
+  const u = (username || "").trim().toLowerCase();
+  return friends.find((f) => (f.username || "").toLowerCase() === u) || null;
+}
 
-    cache.friends = Array.isArray(friendsRes.data) ? friendsRes.data : [];
-    cache.pending = Array.isArray(pendingRes.data) ? pendingRes.data : [];
-    cache.sent = Array.isArray(sentRes.data) ? sentRes.data : [];
+function filterFriendsByQuery(q) {
+  const s = q.trim().toLowerCase();
+  if (!s) return friends.slice();
+  return friends.filter((f) => {
+    const name = (f.name || "").toLowerCase();
+    const un = (f.username || "").toLowerCase();
+    return name.includes(s) || un.includes(s);
+  });
+}
 
-    renderCounts();
-    renderList();
-  } catch (e) {
-    console.error(e);
-    peopleList.innerHTML = `<div class="empty muted">${escapeHtml(e.message)}</div>`;
-    listStatus.textContent = "";
-  } finally {
-    refreshBtn.disabled = false;
-    refreshBtn.textContent = "Refresh";
+async function runSearch() {
+  const q = searchInput.value.trim();
+  if (!q) {
+    showSearchMode(false);
+    return;
+  }
+
+  showSearchMode(true);
+  searchHint.textContent = "Search results";
+
+  searchList.innerHTML = "";
+  setEmpty(searchEmpty, false);
+
+  // 1) matching friends
+  const matches = filterFriendsByQuery(q);
+  matches.forEach((u) => {
+    const isSel = selectedFriend && selectedFriend.id === u.id;
+    const el = cardEl(u, {
+      selected: isSel,
+      onClick: async () => {
+        selectedFriend = u;
+        renderHeader();
+        try { await fetchUndeliveredForFriend(u); } catch {}
+        renderChat();
+        // keep search results visible (like your drawing), but update highlight
+        runSearch().catch(() => {});
+      },
+    });
+    searchList.appendChild(el);
+  });
+
+  // 2) if exact username isn't already a friend, try remote /search/<username>
+  const exactFriend = findFriendByUsername(q);
+  if (!exactFriend) {
+    try {
+      const found = await fetchJSON(`/search/${encodeURIComponent(q)}`);
+      const isMe = me && String(found.id) === String(me.id);
+
+      // show "new user" row with Add button
+      const el = cardEl(
+        { ...found, profile_pic_url: found.profile_pic },
+        {
+          subtitle: "@" + found.username,
+          selectable: false,
+          rightButton: {
+            label: isMe ? "That’s you" : "Add",
+            className: isMe ? "" : "add",
+            disabled: isMe,
+            onClick: async (btn) => {
+              btn.disabled = true;
+              btn.textContent = "Adding...";
+              try {
+                const resp = await postAction(`/addfriend/${found.id}`);
+                btn.classList.remove("add");
+                btn.classList.add("ok");
+                btn.textContent = resp.status === "accepted" ? "Accepted ✓" : "Sent ✓";
+                await refreshAll();
+              } catch (e) {
+                alert(e.message);
+                btn.disabled = false;
+                btn.textContent = "Add";
+              }
+            },
+          },
+        }
+      );
+      searchList.appendChild(el);
+    } catch {
+      // ignore not found; we'll show whatever friend matches exist
+    }
+  }
+
+  if (!searchList.children.length) {
+    setEmpty(searchEmpty, true);
   }
 }
 
-// ---- Offline messages ----
-// Calls your endpoint GET /undelivered_msg/<friend_id>
-// Expected response: { data: [ {from: <sender_id>, message: "..."} ] } or {error:"No messages found"}
+/* ---- Friend Requests "Page" ---- */
+function openRequestsPage() {
+  requestsPage.classList.remove("hidden");
+  renderRequestsList();
+}
+
+function closeRequestsPage() {
+  requestsPage.classList.add("hidden");
+}
+
+function setReqTab(tab) {
+  reqTab = tab;
+  reqTabs.forEach((b) => b.classList.toggle("active", b.dataset.reqtab === tab));
+  renderRequestsList();
+}
+
+function renderRequestsList() {
+  const q = (reqSearchInput.value || "").trim().toLowerCase();
+  const src = reqTab === "received" ? pending : sent;
+
+  const items = !q
+    ? src
+    : src.filter((u) => {
+        const name = (u.name || "").toLowerCase();
+        const un = (u.username || "").toLowerCase();
+        return name.includes(q) || un.includes(q);
+      });
+
+  reqList.innerHTML = "";
+  setEmpty(reqEmpty, items.length === 0);
+
+  items.forEach((u) => {
+    if (reqTab === "received") {
+      const el = cardEl(u, {
+        selectable: false,
+        rightButton: {
+          label: "Accept",
+          className: "ok",
+          onClick: async (btn) => {
+            btn.disabled = true;
+            try {
+              await postAction(`/accept_friends/${u.id}`);
+              await refreshAll();
+            } catch (e) {
+              alert(e.message);
+              btn.disabled = false;
+            }
+          },
+        },
+      });
+
+      // add Decline button beside Accept
+      const actions = el.querySelector(".card-actions");
+      const decline = document.createElement("button");
+      decline.className = "pill-btn danger";
+      decline.textContent = "Decline";
+      decline.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        decline.disabled = true;
+        try {
+          await postAction(`/decline_friends/${u.id}`);
+          await refreshAll();
+        } catch (err) {
+          alert(err.message);
+          decline.disabled = false;
+        }
+      });
+      actions.appendChild(decline);
+
+      reqList.appendChild(el);
+      return;
+    }
+
+    // sent tab (no actions)
+    const el = cardEl(u, { selectable: false });
+    reqList.appendChild(el);
+  });
+}
+
+/* ---- Counts/badges ---- */
+function renderBadges() {
+  // badge shows received count (like your drawing)
+  const n = pending.length;
+  reqBadge.textContent = String(n);
+  reqBadge.classList.toggle("hidden", n <= 0);
+}
+
+/* ---- Offline messages ---- */
 async function fetchUndeliveredForFriend(friend) {
   if (!friend || !friend.id) return;
 
@@ -314,111 +471,7 @@ async function fetchUndeliveredForFriend(friend) {
   saveMsgs(friend.username, msgs);
 }
 
-// ---- Search + Add friend ----
-async function doSearch() {
-  const u = searchInput.value.trim();
-  if (!u) {
-    searchResult.innerHTML = `<span class="muted">Type a username.</span>`;
-    return;
-  }
-
-  searchBtn.disabled = true;
-  searchBtn.textContent = "Searching...";
-
-  try {
-    const data = await fetchJSON(`/search/${encodeURIComponent(u)}`);
-    const isMe = me && String(data.id) === String(me.id);
-
-    searchResult.innerHTML = `
-      <img class="avatar" alt="" src="${safeAvatar(data.profile_pic)}" />
-      <div class="meta">
-        <p class="name">${escapeHtml(data.name || "")}</p>
-        <p class="user">@${escapeHtml(data.username || "")} <span class="muted">(id: ${escapeHtml(
-      String(data.id)
-    )})</span></p>
-      </div>
-      <div class="row-actions">
-        <button id="addBtn" class="btn primary" ${isMe ? "disabled" : ""}>
-          ${isMe ? "That’s you" : "Send Request"}
-        </button>
-      </div>
-    `;
-
-    const addBtn = $("#addBtn");
-    if (!isMe) {
-      addBtn.addEventListener("click", async () => {
-        addBtn.disabled = true;
-        addBtn.textContent = "Sending...";
-        try {
-          const resp = await postAction(`/addfriend/${data.id}`);
-          addBtn.classList.remove("primary");
-          addBtn.classList.add("ok");
-          addBtn.textContent = resp.status === "accepted" ? "Accepted ✅" : "Sent ✅";
-          await refreshAll();
-        } catch (e) {
-          alert(e.message);
-          addBtn.disabled = false;
-          addBtn.textContent = "Send Request";
-        }
-      });
-    }
-  } catch (e) {
-    searchResult.innerHTML = `<span class="muted">${escapeHtml(e.message)}</span>`;
-  } finally {
-    searchBtn.disabled = false;
-    searchBtn.textContent = "Search";
-  }
-}
-
-// ---- Socket.IO ----
-async function initSocket() {
-  socket = io();
-
-  socket.on("connect", () => {
-    sockStatus.textContent = "connected";
-    // register by username so server can map username -> sid
-    socket.emit("register", { username: me.username });
-  });
-
-  socket.on("disconnect", () => {
-    sockStatus.textContent = "disconnected";
-  });
-
-  socket.on("error_message", (data) => {
-    alert(data?.error || "Socket error");
-  });
-
-  // Optional status event if you implement it server-side
-  socket.on("message_status", (data) => {
-    // {status:'stored'|'delivered', to:'username'}
-    // You can display this somewhere if you want. For now just log.
-    console.log("message_status:", data);
-  });
-
-  // Receive a private message
-  socket.on("private_message", async (data) => {
-    // expected: { from: "<username>", message: "<text>" }
-    const from = data?.from;
-    const text = data?.message;
-
-    if (!from || typeof text !== "string") return;
-
-    // IMPORTANT: your server echoes the message back to sender too.
-    // Since we already do optimistic UI on send, ignore our own echo.
-    if (me && from === me.username) return;
-
-    // store locally under that sender username
-    const msgs = loadMsgs(from);
-    msgs.push({ who: "them", from, text, ts: Date.now() });
-    saveMsgs(from, msgs);
-
-    // If currently chatting with that person, show it
-    if (selectedFriend && selectedFriend.username === from) {
-      renderChat();
-    }
-  });
-}
-
+/* ---- Send message ---- */
 function sendMessage() {
   if (!socket || !selectedFriend || !me) return;
   const text = msgInput.value.trim();
@@ -426,31 +479,131 @@ function sendMessage() {
 
   const friendU = selectedFriend.username;
 
-  // optimistic local store
+  // optimistic store
   const msgs = loadMsgs(friendU);
   msgs.push({ who: "me", from: me.username, text, ts: Date.now() });
   saveMsgs(friendU, msgs);
 
-  // send through socket
   socket.emit("private_message", { to: friendU, message: text });
 
   msgInput.value = "";
   renderChat();
 }
 
-// Clear local chat (demo)
-clearBtn.addEventListener("click", () => {
-  if (!selectedFriend) return;
-  localStorage.removeItem(msgKey(selectedFriend.username));
-  renderChat();
+/* ---- Socket.IO ---- */
+async function initSocket() {
+  socket = io();
+
+  socket.on("connect", () => {
+    sockStatus.textContent = "connected";
+    sockDot.style.background = "#26b49f";
+    socket.emit("register", { username: me.username });
+  });
+
+  socket.on("disconnect", () => {
+    sockStatus.textContent = "disconnected";
+    sockDot.style.background = "#bbb";
+  });
+
+  socket.on("error_message", (data) => {
+    alert(data?.error || "Socket error");
+  });
+
+  socket.on("private_message", (data) => {
+    const from = data?.from;
+    const text = data?.message;
+    if (!from || typeof text !== "string") return;
+
+    // server echoes back to sender too; ignore our own echo (we already rendered)
+    if (me && from === me.username) return;
+
+    // store locally under sender username
+    const msgs = loadMsgs(from);
+    msgs.push({ who: "them", from, text, ts: Date.now() });
+    saveMsgs(from, msgs);
+
+    // if chatting with them, show it
+    if (selectedFriend && selectedFriend.username === from) {
+      renderChat();
+    }
+  });
+}
+
+/* ---- Data refresh ---- */
+async function refreshAll() {
+  const [friendsRes, pendingRes, sentRes] = await Promise.all([
+    fetchJSON("/list_friends"),
+    fetchJSON("/get_pending_requests"),
+    fetchJSON("/sent_requests"),
+  ]);
+
+  friends = Array.isArray(friendsRes.data) ? friendsRes.data : [];
+  pending = Array.isArray(pendingRes.data) ? pendingRes.data : [];
+  sent = Array.isArray(sentRes.data) ? sentRes.data : [];
+
+  renderBadges();
+  renderFriendsList();
+
+  // keep search results updated if currently searching
+  if (searchInput.value.trim()) {
+    runSearch().catch(() => {});
+  }
+
+  // if selected friend was removed, clear selection
+  if (selectedFriend) {
+    const still = friends.find((f) => f.id === selectedFriend.id);
+    if (!still) {
+      selectedFriend = null;
+      renderHeader();
+      renderChat();
+    } else {
+      selectedFriend = still; // refresh object
+      renderHeader();
+    }
+  }
+
+  // requests page list refresh if open
+  if (!requestsPage.classList.contains("hidden")) {
+    renderRequestsList();
+  }
+}
+
+/* ---- Settings modal ---- */
+function openSettings() {
+  modalBackdrop.classList.remove("hidden");
+  settingsModal.classList.remove("hidden");
+}
+function closeSettings() {
+  modalBackdrop.classList.add("hidden");
+  settingsModal.classList.add("hidden");
+}
+
+/* ---- Events ---- */
+searchBtn.addEventListener("click", runSearch);
+searchInput.addEventListener("input", () => {
+  const q = searchInput.value.trim();
+  if (!q) {
+    showSearchMode(false);
+    return;
+  }
+  // small debounce feel without timers: just run immediately
+  runSearch().catch(() => {});
+});
+searchInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") runSearch();
 });
 
-// ---- Events ----
-refreshBtn.addEventListener("click", refreshAll);
-tabs.forEach((t) => t.addEventListener("click", () => setTab(t.dataset.tab)));
-searchBtn.addEventListener("click", doSearch);
-searchInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") doSearch();
+requestsBtn.addEventListener("click", () => {
+  openRequestsPage();
+});
+reqBackBtn.addEventListener("click", closeRequestsPage);
+
+reqTabs.forEach((b) => b.addEventListener("click", () => setReqTab(b.dataset.reqtab)));
+
+reqSearchBtn.addEventListener("click", renderRequestsList);
+reqSearchInput.addEventListener("input", renderRequestsList);
+reqSearchInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") renderRequestsList();
 });
 
 sendBtn.addEventListener("click", sendMessage);
@@ -461,25 +614,50 @@ msgInput.addEventListener("keydown", (e) => {
   }
 });
 
-// ---- Boot ----
-(async function boot() {
-  setTab("friends");
+clearBtn.addEventListener("click", () => {
+  if (!selectedFriend) return;
+  localStorage.removeItem(msgKey(selectedFriend.username));
+  renderChat();
+});
 
+settingsBtn.addEventListener("click", openSettings);
+closeSettingsBtn.addEventListener("click", closeSettings);
+modalBackdrop.addEventListener("click", closeSettings);
+
+/* ---- Boot ---- */
+(async function boot() {
+  // load me
   try {
-    me = await fetchJSON("/me"); // must exist (you have it)
+    me = await fetchJSON("/me");
   } catch (e) {
-    sockStatus.textContent = "error";
     alert("Cannot load /me. Are you logged in?");
     return;
   }
 
-  await refreshAll();
+  // set avatars
+  meAvatar.src = safeAvatar(me.profile_pic_url);
 
+  // initial render
+  renderHeader();
+  renderChat();
+
+  // load lists
+  try {
+    await refreshAll();
+  } catch (e) {
+    console.error(e);
+    alert(e.message);
+  }
+
+  // socket
   try {
     await initSocket();
   } catch (e) {
     console.error(e);
     sockStatus.textContent = "error";
-    alert("Socket init failed.");
+    sockDot.style.background = "#ff4b4b";
   }
+
+  // default requests tab
+  setReqTab("received");
 })();
